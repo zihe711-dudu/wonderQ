@@ -18,9 +18,8 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 export default function RemotePlayPage() {
-  const params = useParams<{ quizId: string }>();
+  const { quizId } = useParams<{ quizId: string }>();
   const router = useRouter();
-  const quizId = params?.quizId;
 
   const [loading, setLoading] = useState(true);
   const [quiz, setQuiz] = useState<RemoteQuiz | null>(null);
@@ -35,8 +34,13 @@ export default function RemotePlayPage() {
   useEffect(() => {
     let mounted = true;
     async function init() {
+      if (!quizId) {
+        setLoading(false);
+        setQuiz(null);
+        return;
+      }
       setLoading(true);
-      const q = quizId ? await loadRemoteQuiz(quizId) : null;
+      const q = await loadRemoteQuiz(quizId);
       if (!mounted) return;
       setQuiz(q);
       setLoading(false);
@@ -122,7 +126,7 @@ export default function RemotePlayPage() {
         <Card className="w-full">
           <CardHeader>
             <CardTitle>找不到這個題庫</CardTitle>
-            <CardDescription>請確認分享連結是否正確。</CardDescription>
+            <CardDescription>請確認分享連結或伺服器設定。</CardDescription>
           </CardHeader>
           <CardFooter>
             <Button onClick={() => router.push("/")}>回到首頁</Button>

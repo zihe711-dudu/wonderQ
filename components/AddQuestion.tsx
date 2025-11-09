@@ -26,7 +26,7 @@ export default function AddQuestion() {
   const [options, setOptions] = useState<OptionsArray>(["", "", "", ""]);
   const [correctIndex, setCorrectIndex] = useState<0 | 1 | 2 | 3>(0);
   const [message, setMessage] = useState<string>("");
-  const [publishLink, setPublishLink] = useState<string>("");
+  const [shareLink, setShareLink] = useState<string>("");
 
   const isValid = useMemo(() => {
     return (
@@ -80,14 +80,14 @@ export default function AddQuestion() {
   const onClearAll = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY);
     setMessage("已清空所有本機題目！");
-    setPublishLink("");
+    setShareLink("");
   }, []);
 
   const onPublish = useCallback(async () => {
     const existing = loadExisting();
     if (existing.length === 0) {
-      setMessage("請先在本機新增幾題再發佈喔！");
-      setPublishLink("");
+      setMessage("請先新增幾題再發佈喔！");
+      setShareLink("");
       return;
     }
     const defaultTitle = "我的小小問答挑戰";
@@ -98,11 +98,11 @@ export default function AddQuestion() {
       const quizId = await publishQuizFromLocal(existing, title, creator);
       const origin = window.location.origin;
       const link = `${origin}/play/${quizId}`;
-      setPublishLink(link);
-      setMessage("發佈成功！把連結分享給同學一起挑戰吧！");
+      setShareLink(link);
+      setMessage("發佈成功！把下面的連結分享給同學：");
     } catch {
       setMessage("發佈失敗，請稍後再試。");
-      setPublishLink("");
+      setShareLink("");
     }
   }, []);
 
@@ -166,9 +166,9 @@ export default function AddQuestion() {
             <div className="rounded-2xl bg-yellow-100 text-gray-900 px-4 py-2">
               {message}
             </div>
-            {publishLink && (
+            {shareLink && (
               <div className="rounded-2xl border border-pink-200 bg-white/90 px-4 py-2 break-all">
-                分享連結：<a className="text-pink-600 underline" href={publishLink} target="_blank" rel="noreferrer">{publishLink}</a>
+                分享連結：<a className="text-pink-600 underline" href={shareLink} target="_blank" rel="noreferrer">{shareLink}</a>
               </div>
             )}
           </div>
