@@ -7,6 +7,10 @@ import { Button } from "@/components/ui/button";
 import { addLeaderboardEntry } from "@/lib/leaderboard";
 import { playCorrect, playWrong, playFinish } from "@/lib/sfx";
 
+type PlayQuizProps = {
+  onExit?: () => void;
+};
+
 function loadQuestions(): QuizQuestion[] {
   if (typeof window === "undefined") return [];
   try {
@@ -29,7 +33,7 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-export default function PlayQuiz() {
+export default function PlayQuiz({ onExit }: PlayQuizProps) {
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [order, setOrder] = useState<number[]>([]);
   const [current, setCurrent] = useState<number>(0);
@@ -82,6 +86,15 @@ export default function PlayQuiz() {
     setFinished(false);
   }, []);
 
+  const handleExit = useCallback(() => {
+    if (!onExit) return;
+    if (!finished) {
+      const ok = window.confirm("要離開嗎？目前挑戰進度會被清除喔！");
+      if (!ok) return;
+    }
+    onExit();
+  }, [onExit, finished]);
+
   if (questions.length === 0) {
     return (
       <Card className="w-full">
@@ -133,7 +146,10 @@ export default function PlayQuiz() {
             </Button>
           </div>
         </CardContent>
-        <CardFooter className="flex justify-center">
+        <CardFooter className="flex flex-wrap items-center justify-center gap-3">
+          <Button onClick={handleExit} variant="outline">
+            離開挑戰
+          </Button>
           <Button onClick={reset} className="btn-cute btn-blue">
             再玩一次
           </Button>
@@ -145,10 +161,17 @@ export default function PlayQuiz() {
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle>開始玩！</CardTitle>
-        <CardDescription>
-          第 {current + 1} 題，共 {questions.length} 題
-        </CardDescription>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <CardTitle>開始玩！</CardTitle>
+            <CardDescription>
+              第 {current + 1} 題，共 {questions.length} 題
+            </CardDescription>
+          </div>
+          <Button onClick={handleExit} variant="outline" size="sm">
+            離開挑戰
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="rounded-2xl bg-white/90 border border-pink-200 p-4">

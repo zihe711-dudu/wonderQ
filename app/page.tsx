@@ -47,12 +47,16 @@ export default function Home() {
 
         <div className="mt-6">
           {tab === "play" ? (
-            <PlayQuiz />
+            <PlayQuiz onExit={() => setTab("rank")} />
           ) : tab === "add" ? (
             <AddQuestion />
           ) : (
             <Leaderboard />
           )}
+        </div>
+
+        <div className="mt-6 rounded-2xl border border-pink-200 bg-white/80 p-4 text-sm text-gray-700">
+          想給其他同學一起玩嗎？在【出題囉】頁面完成題目後，點【發佈成分享題庫】，把連結貼給大家，就可以在各自的手機或電腦上作答，成績會記錄在雲端排行榜！
         </div>
       </div>
     </main>
