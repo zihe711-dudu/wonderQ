@@ -7,6 +7,7 @@ import AuthBar from "@/components/AuthBar";
 import { listenUser, signInWithGoogle, type SimpleUser } from "@/lib/auth";
 import { createRoomWithQuestions } from "@/lib/rooms";
 import type { QuizQuestion, RoomQuestionCount } from "@/types";
+import Avatar from "@/components/Avatar";
 
 type DraftQuestion = {
   prompt: string;
@@ -208,17 +209,7 @@ export default function RoomBuilder() {
             </div>
             <div className="flex items-center gap-3 text-sm text-gray-600">
               <span>房間主：</span>
-              {user.photoUrl ? (
-                <img
-                  src={user.photoUrl}
-                  alt={user.name}
-                  className="h-8 w-8 rounded-full object-cover"
-                />
-              ) : (
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-pink-200 text-sm font-bold text-pink-600">
-                  {user.name.slice(0, 1)}
-                </div>
-              )}
+              <Avatar name={user.name} src={user.photoUrl} size="sm" />
               <span>{user.name}</span>
             </div>
           </div>

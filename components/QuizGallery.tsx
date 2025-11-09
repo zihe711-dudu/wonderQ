@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getFirebase } from "@/lib/firebase";
-import { collection, getDocs, limit, orderBy, query } from "firebase/firestore";
+import { collection, getDocs, query } from "firebase/firestore";
 import type { RemoteQuiz } from "@/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ export default function QuizGallery() {
   const [quizzes, setQuizzes] = useState<RemoteQuiz[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
+  const [keyword, setKeyword] = useState("");
 
   useEffect(() => {
     async function fetchQuizzes() {
@@ -64,9 +65,35 @@ export default function QuizGallery() {
     );
   }
 
+  const filtered = quizzes.filter((q) => {
+    const k = keyword.trim().toLowerCase();
+    if (!k) return true;
+    return (
+      q.title.toLowerCase().includes(k) ||
+      (q.ownerName || "").toLowerCase().includes(k)
+    );
+  });
+
   return (
     <div className="space-y-3">
-      {quizzes.map((qz) => (
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
+          placeholder="搜尋題庫或老師名稱"
+          className="flex-1 rounded-2xl border border-pink-200 bg-white/90 p-3 outline-none focus:ring-2 focus:ring-pink-300"
+        />
+        <Button variant="outline" onClick={() => router.push("/")}>
+          回首頁
+        </Button>
+      </div>
+      {filtered.length === 0 && (
+        <div className="rounded-2xl bg-yellow-100 text-gray-900 px-4 py-2">
+          找不到符合「{keyword}」的題庫。
+        </div>
+      )}
+      {filtered.map((qz) => (
         <Card key={qz.id} className="w-full">
           <CardHeader>
             <div className="flex items-center justify-between gap-3">

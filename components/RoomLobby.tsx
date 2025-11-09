@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { listenUser, signInWithGoogle, type SimpleUser } from "@/lib/auth";
 import { listRooms } from "@/lib/rooms";
 import type { RemoteQuiz } from "@/types";
+import Avatar from "@/components/Avatar";
 
 export default function RoomLobby() {
   const router = useRouter();
@@ -122,17 +123,7 @@ export default function RoomLobby() {
                   className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-pink-200 bg-white/80 p-4 shadow-sm"
                 >
                   <div className="flex items-center gap-3">
-                    {room.ownerPhotoUrl ? (
-                      <img
-                        src={room.ownerPhotoUrl}
-                        alt={room.ownerName}
-                        className="h-10 w-10 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-pink-200 text-sm font-bold text-pink-600">
-                        {room.ownerName.slice(0, 1)}
-                      </div>
-                    )}
+                    <Avatar name={room.ownerName} src={room.ownerPhotoUrl} size="md" />
                     <div>
                       <div className="text-base font-semibold text-gray-800">{room.title}</div>
                       <div className="text-sm text-gray-600">

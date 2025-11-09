@@ -65,6 +65,34 @@ export async function loadRemoteQuiz(quizId: string): Promise<RemoteQuiz | null>
   }
 }
 
+export async function publishPublicQuiz(
+  questions: QuizQuestion[],
+  title: string,
+  owner: { uid: string; name: string; photoUrl: string | null },
+  meta?: { tags?: string[]; grade?: string; subject?: string; status?: "active" | "archived" }
+): Promise<string> {
+  const db = ensureDb();
+  if (!Array.isArray(questions) || questions.length === 0) {
+    throw new Error("無題目可發佈");
+  }
+  const payload: any = {
+    title: title?.trim() || "我的小小問答挑戰",
+    ownerUid: owner.uid,
+    ownerName: owner.name,
+    ownerPhotoUrl: owner.photoUrl ?? null,
+    questionCount: questions.length,
+    questions,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    status: meta?.status || "active"
+  };
+  if (meta?.tags) payload.tags = meta.tags;
+  if (meta?.grade) payload.grade = meta.grade;
+  if (meta?.subject) payload.subject = meta.subject;
+  const ref = await addDoc(collection(db, "quizzes"), payload);
+  return ref.id;
+}
+
 export async function addRemoteResult(
   quizId: string,
   name: string,

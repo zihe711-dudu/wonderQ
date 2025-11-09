@@ -8,6 +8,7 @@ import { listenUser, signInWithGoogle, type SimpleUser } from "@/lib/auth";
 import { addRoomResult, getRoom, getRoomResults, getUserRank } from "@/lib/rooms";
 import type { RemoteQuiz, RemoteResult } from "@/types";
 import { playCorrect, playWrong, playFinish } from "@/lib/sfx";
+import Avatar from "@/components/Avatar";
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -36,6 +37,7 @@ export default function RoomPlayPage() {
   const [results, setResults] = useState<RemoteResult[]>([]);
   const [showMore, setShowMore] = useState(false);
   const [userRank, setUserRank] = useState<{ rank: number; best: RemoteResult } | null>(null);
+  const [answers, setAnswers] = useState<number[]>([]);
 
   useEffect(() => {
     const unsubscribe = listenUser((u) => {
@@ -61,6 +63,7 @@ export default function RoomPlayPage() {
         setCurrent(0);
         setScore(0);
         setFinished(false);
+        setAnswers([]);
       }
     }
     fetchRoom();
@@ -97,6 +100,11 @@ export default function RoomPlayPage() {
       } else {
         playWrong();
       }
+      setAnswers((prev) => {
+        const next = [...prev];
+        next[current] = choice;
+        return next;
+      });
       if (current + 1 >= order.length) {
         setFinished(true);
         playFinish();
@@ -119,8 +127,17 @@ export default function RoomPlayPage() {
     async function saveResult() {
       if (!finished || !room || !user) return;
       await addRoomResult(room.id, user, score, room.questions.length);
-      const list = await getRoomResults(room.id, 30);
-      setResults(list);
+      // 去重：同一 userUid 只保留最高分
+      const list = await getRoomResults(room.id, 500);
+      const bestMap = new Map<string, RemoteResult>();
+      list.forEach((r) => {
+        const exists = bestMap.get(r.userUid);
+        if (!exists || r.score > exists.score) bestMap.set(r.userUid, r);
+      });
+      const dedup = Array.from(bestMap.values()).sort((a, b) =>
+        b.score !== a.score ? b.score - a.score : a.createdAt - b.createdAt
+      );
+      setResults(dedup);
       const rank = await getUserRank(room.id, user.uid);
       setUserRank(rank);
     }
@@ -177,6 +194,11 @@ export default function RoomPlayPage() {
   }
 
   const visibleResults = results.slice(0, showMore ? 30 : 10);
+  const wrongs = finished && room
+    ? order
+        .map((idx, i) => ({ i, q: room.questions[idx], chosen: answers[i] }))
+        .filter((x) => typeof x.chosen === "number" && x.q.correctIndex !== x.chosen)
+    : [];
 
   return (
     <main className="container mx-auto max-w-3xl px-4 py-10">
@@ -191,17 +213,7 @@ export default function RoomPlayPage() {
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2">
-                {room.ownerPhotoUrl ? (
-                  <img
-                    src={room.ownerPhotoUrl}
-                    alt={room.ownerName}
-                    className="h-10 w-10 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-pink-200 text-sm font-bold text-pink-600">
-                    {room.ownerName.slice(0, 1)}
-                  </div>
-                )}
+                <Avatar name={room.ownerName} src={room.ownerPhotoUrl} size="md" />
               </div>
             </div>
           </CardHeader>
@@ -264,17 +276,7 @@ export default function RoomPlayPage() {
                       <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-pink-100 text-pink-600 font-bold">
                         {index + 1}
                       </span>
-                      {result.photoUrl ? (
-                        <img
-                          src={result.photoUrl}
-                          alt={result.name}
-                          className="h-8 w-8 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-pink-200 text-xs font-bold text-pink-600">
-                          {result.name.slice(0, 1)}
-                        </div>
-                      )}
+                      <Avatar name={result.name} src={result.photoUrl} size="sm" />
                       <span className="font-semibold text-gray-800">{result.name}</span>
                     </div>
                     <div className="text-pink-600 font-bold">
@@ -297,17 +299,7 @@ export default function RoomPlayPage() {
                   <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-blue-200 text-blue-700 font-bold">
                     第 {userRank.rank} 名
                   </span>
-                  {userRank.best.photoUrl ? (
-                    <img
-                      src={userRank.best.photoUrl}
-                      alt={userRank.best.name}
-                      className="h-8 w-8 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-200 text-xs font-bold text-blue-700">
-                      {userRank.best.name.slice(0, 1)}
-                    </div>
-                  )}
+                  <Avatar name={userRank.best.name} src={userRank.best.photoUrl} size="sm" className="bg-blue-200 text-blue-700" />
                   <span className="font-semibold text-blue-700">{userRank.best.name}</span>
                 </div>
                 <div className="text-blue-700 font-bold">
@@ -317,6 +309,28 @@ export default function RoomPlayPage() {
             </CardFooter>
           )}
         </Card>
+
+        {finished && wrongs.length > 0 && (
+          <Card className="w-full">
+            <CardHeader>
+              <CardTitle>錯題回顧</CardTitle>
+              <CardDescription>看看哪幾題需要再加強～</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {wrongs.map(({ i, q, chosen }) => (
+                <div key={i} className="rounded-2xl border border-pink-200 bg-white/90 p-3">
+                  <div className="font-medium text-gray-800">第 {i + 1} 題：{q.prompt}</div>
+                  <div className="mt-1 text-sm">
+                    你的答案：<span className="text-pink-600 font-semibold">{q.options[chosen as number]}</span>
+                  </div>
+                  <div className="text-sm">
+                    正確答案：<span className="text-green-600 font-semibold">{q.options[q.correctIndex]}</span>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
       </div>
     </main>
   );

@@ -8,6 +8,7 @@ import {
   signOutGoogle,
   type SimpleUser
 } from "@/lib/auth";
+import Avatar from "@/components/Avatar";
 
 type AuthBarProps = {
   className?: string;
@@ -32,17 +33,7 @@ export default function AuthBar({ className }: AuthBarProps) {
       ) : user ? (
         <>
           <div className="flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 shadow">
-            {user.photoUrl ? (
-              <img
-                src={user.photoUrl}
-                alt={user.name}
-                className="h-8 w-8 rounded-full object-cover"
-              />
-            ) : (
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-pink-200 text-sm font-bold text-pink-600">
-                {user.name.slice(0, 1)}
-              </div>
-            )}
+            <Avatar name={user.name} src={user.photoUrl} size="sm" />
             <span className="text-sm font-medium text-gray-700">{user.name}</span>
           </div>
           <Button variant="outline" size="sm" onClick={() => signOutGoogle()}>

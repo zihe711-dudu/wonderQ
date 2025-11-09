@@ -7,6 +7,7 @@ import type { RemoteQuiz, RemoteResult } from "@/types";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { playCorrect, playWrong, playFinish } from "@/lib/sfx";
+import { listenUser, signInWithGoogle, type SimpleUser } from "@/lib/auth";
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -21,6 +22,8 @@ export default function PublicQuizPlayPage() {
   const { quizId } = useParams<{ quizId: string }>();
   const router = useRouter();
 
+  const [user, setUser] = useState<SimpleUser | null>(null);
+  const [loadingUser, setLoadingUser] = useState(true);
   const [loading, setLoading] = useState(true);
   const [quiz, setQuiz] = useState<RemoteQuiz | null>(null);
   const [order, setOrder] = useState<number[]>([]);
@@ -30,6 +33,16 @@ export default function PublicQuizPlayPage() {
   const [name, setName] = useState<string>("小朋友");
   const [top, setTop] = useState<RemoteResult[]>([]);
   const [saving, setSaving] = useState(false);
+  const [answers, setAnswers] = useState<number[]>([]);
+
+  useEffect(() => {
+    const unsub = listenUser((u) => {
+      setUser(u);
+      setLoadingUser(false);
+      if (u) setName(u.name || "小朋友");
+    });
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -49,8 +62,7 @@ export default function PublicQuizPlayPage() {
         setCurrent(0);
         setScore(0);
         setFinished(false);
-        const defaultName = window.prompt("請輸入你的暱稱：", "小朋友") ?? "小朋友";
-        setName(defaultName.trim().slice(0, 16) || "小朋友");
+        setAnswers([]);
         const list = await getTopResults(q.id, 10);
         if (!mounted) return;
         setTop(list);
@@ -80,6 +92,11 @@ export default function PublicQuizPlayPage() {
       } else {
         playWrong();
       }
+      setAnswers((prev) => {
+        const next = [...prev];
+        next[current] = choice;
+        return next;
+      });
       if (current + 1 >= order.length) {
         setFinished(true);
         playFinish();
@@ -96,7 +113,30 @@ export default function PublicQuizPlayPage() {
     setCurrent(0);
     setScore(0);
     setFinished(false);
+    setAnswers([]);
   }, [quiz]);
+
+  // 快速鍵：1~4 選答案、Enter 下一題或重玩
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!quiz) return;
+      if (!finished) {
+        if (["1", "2", "3", "4"].includes(e.key)) {
+          const idx = Number(e.key) - 1;
+          if (idx >= 0 && idx <= 3) answer(idx);
+        } else if (e.key === "Enter") {
+          if (current < order.length) {
+            // 不作答直接進下一題（略過）
+            answer(-1 as any);
+          }
+        }
+      } else if (e.key === "Enter") {
+        reset();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [quiz, finished, current, order, answer, reset]);
 
   const saveResult = useCallback(async () => {
     if (!quiz) return;
@@ -115,6 +155,41 @@ export default function PublicQuizPlayPage() {
           <CardHeader>
             <CardTitle>題庫讀取中…</CardTitle>
           </CardHeader>
+        </Card>
+      </main>
+    );
+  }
+
+  if (loadingUser) {
+    return (
+      <main className="container mx-auto max-w-3xl px-4 py-10">
+        <Card className="w-full">
+          <CardHeader>
+            <CardTitle>登入狀態載入中…</CardTitle>
+          </CardHeader>
+        </Card>
+      </main>
+    );
+  }
+
+  if (!user) {
+    return (
+      <main className="container mx-auto max-w-3xl px-4 py-10">
+        <Card className="w-full">
+          <CardHeader>
+            <CardTitle>開始前先登入</CardTitle>
+            <CardDescription>要作答並記錄分數，請先使用 Google 登入。</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button className="btn-cute btn-blue" onClick={() => signInWithGoogle()}>
+              Google 登入
+            </Button>
+          </CardContent>
+          <CardFooter>
+            <Button variant="outline" onClick={() => router.push("/")}>
+              回首頁
+            </Button>
+          </CardFooter>
         </Card>
       </main>
     );
@@ -148,7 +223,7 @@ export default function PublicQuizPlayPage() {
             <>
               <CardContent className="space-y-4">
                 <div className="text-sm text-gray-600">
-                  你好，{name}！第 {current + 1} 題，共 {quiz.questions.length} 題。分數：{score}
+                  你好，{name}！第 {current + 1} 題，共 {quiz.questions.length} 題。分數：{score}（鍵盤 1~4 作答，Enter 下一題）
                 </div>
                 <div className="rounded-2xl bg-white/90 border border-pink-200 p-4">
                   {currentQuestion?.prompt}
@@ -219,6 +294,36 @@ export default function PublicQuizPlayPage() {
             )}
           </CardContent>
         </Card>
+
+        {finished && quiz && (
+          (() => {
+            const wrongs = order
+              .map((idx, i) => ({ i, q: quiz.questions[idx], chosen: answers[i] }))
+              .filter((x) => typeof x.chosen === "number" && x.q.correctIndex !== x.chosen);
+            if (wrongs.length === 0) return null;
+            return (
+              <Card className="w-full">
+                <CardHeader>
+                  <CardTitle>錯題回顧</CardTitle>
+                  <CardDescription>看看哪幾題需要再加強～</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {wrongs.map(({ i, q, chosen }) => (
+                    <div key={i} className="rounded-2xl border border-pink-200 bg-white/90 p-3">
+                      <div className="font-medium text-gray-800">第 {i + 1} 題：{q.prompt}</div>
+                      <div className="mt-1 text-sm">
+                        你的答案：<span className="text-pink-600 font-semibold">{q.options[chosen as number]}</span>
+                      </div>
+                      <div className="text-sm">
+                        正確答案：<span className="text-green-600 font-semibold">{q.options[q.correctIndex]}</span>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            );
+          })()
+        )}
       </div>
     </main>
   );
