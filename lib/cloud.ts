@@ -97,7 +97,8 @@ export async function addRemoteResult(
   quizId: string,
   name: string,
   score: number,
-  total: number
+  total: number,
+  extra?: { points?: number; timeMs?: number }
 ): Promise<void> {
   try {
     const db = ensureDb();
@@ -106,6 +107,8 @@ export async function addRemoteResult(
     await addDoc(resultsCol, {
       userUid: "",
       name: safeName,
+      points: extra?.points ?? score,
+      timeMs: extra?.timeMs ?? null,
       photoUrl: null,
       score,
       total,
@@ -129,6 +132,8 @@ export async function getTopResults(quizId: string, limitN: number): Promise<Rem
         id: d.id,
         userUid: data.userUid ?? "",
         name: data.name ?? "小朋友",
+        points: typeof data.points === "number" ? data.points : (Number(data.score) || 0),
+        timeMs: typeof data.timeMs === "number" ? data.timeMs : null,
         photoUrl: data.photoUrl ?? null,
         score: Number(data.score) || 0,
         total: Number(data.total) || 0,
@@ -136,7 +141,9 @@ export async function getTopResults(quizId: string, limitN: number): Promise<Rem
       };
     });
     list.sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
+      const pa = a.points ?? a.score;
+      const pb = b.points ?? b.score;
+      if (pb !== pa) return pb - pa;
       return a.createdAt - b.createdAt;
     });
     return list.slice(0, Math.max(1, limitN));

@@ -37,6 +37,8 @@ export type RemoteResult = {
   photoUrl: string | null;
   score: number;
   total: number;
+  points?: number; // 新：積分（含時間加成）
+  timeMs?: number; // 新：總作答耗時（毫秒）
   createdAt: number;
 };
 

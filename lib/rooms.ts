@@ -68,7 +68,8 @@ export async function addRoomResult(
   roomId: string,
   user: SimpleUser,
   score: number,
-  total: number
+  total: number,
+  extra?: { points?: number; timeMs?: number }
 ): Promise<void> {
   try {
     const db = ensureDb();
@@ -79,6 +80,8 @@ export async function addRoomResult(
       photoUrl: user.photoUrl ?? null,
       score,
       total,
+      points: extra?.points ?? score,
+      timeMs: extra?.timeMs ?? null,
       createdAt: Date.now()
     });
   } catch {
@@ -103,11 +106,15 @@ export async function getRoomResults(
         photoUrl: data.photoUrl ?? null,
         score: Number(data.score) || 0,
         total: Number(data.total) || 0,
+        points: typeof data.points === "number" ? data.points : (Number(data.score) || 0),
+        timeMs: typeof data.timeMs === "number" ? data.timeMs : null,
         createdAt: typeof data.createdAt === "number" ? data.createdAt : Date.now()
       };
     });
     list.sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
+      const pa = a.points ?? a.score;
+      const pb = b.points ?? b.score;
+      if (pb !== pa) return pb - pa;
       return a.createdAt - b.createdAt;
     });
     return list.slice(0, Math.max(1, limitN));
@@ -133,11 +140,15 @@ export async function getUserRank(
         photoUrl: data.photoUrl ?? null,
         score: Number(data.score) || 0,
         total: Number(data.total) || 0,
+        points: typeof data.points === "number" ? data.points : (Number(data.score) || 0),
+        timeMs: typeof data.timeMs === "number" ? data.timeMs : null,
         createdAt: typeof data.createdAt === "number" ? data.createdAt : Date.now()
       };
     });
     list.sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
+      const pa = a.points ?? a.score;
+      const pb = b.points ?? b.score;
+      if (pb !== pa) return pb - pa;
       return a.createdAt - b.createdAt;
     });
     const index = list.findIndex((item) => item.userUid === userUid);

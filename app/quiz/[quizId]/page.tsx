@@ -116,6 +116,20 @@ export default function PublicQuizPlayPage() {
     setAnswers([]);
   }, [quiz]);
 
+  useEffect(() => {
+    if (finished || !quiz) return;
+    const timer = setInterval(() => {
+      setRemainMs((ms) => {
+        if (ms <= 100) {
+          answer(-1 as any);
+          return timePerQuestionMs;
+        }
+        return ms - 100;
+      });
+    }, 100);
+    return () => clearInterval(timer);
+  }, [finished, quiz, answer, current]);
+
   // 快速鍵：1~4 選答案、Enter 下一題或重玩
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -141,12 +155,12 @@ export default function PublicQuizPlayPage() {
   const saveResult = useCallback(async () => {
     if (!quiz) return;
     setSaving(true);
-    await addRemoteResult(quiz.id, name, score, quiz.questions.length);
+    await addRemoteResult(quiz.id, name, score, quiz.questions.length, { points, timeMs });
     const list = await getTopResults(quiz.id, 10);
     setTop(list);
     setSaving(false);
     alert("已把你的成績存到雲端排行榜！");
-  }, [quiz, name, score]);
+  }, [quiz, name, score, points, timeMs]);
 
   if (loading) {
     return (
@@ -223,7 +237,7 @@ export default function PublicQuizPlayPage() {
             <>
               <CardContent className="space-y-4">
                 <div className="text-sm text-gray-600">
-                  你好，{name}！第 {current + 1} 題，共 {quiz.questions.length} 題。分數：{score}（鍵盤 1~4 作答，Enter 下一題）
+                  你好，{name}！第 {current + 1} 題，共 {quiz.questions.length} 題。分數：{score}｜積分：{points}｜剩餘：{Math.ceil(remainMs/1000)} 秒（鍵盤 1~4 作答，Enter 下一題）
                 </div>
                 <div className="rounded-2xl bg-white/90 border border-pink-200 p-4">
                   {currentQuestion?.prompt}

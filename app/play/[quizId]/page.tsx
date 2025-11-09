@@ -32,12 +32,16 @@ export default function RoomPlayPage() {
   const [order, setOrder] = useState<number[]>([]);
   const [current, setCurrent] = useState(0);
   const [score, setScore] = useState(0);
+  const [points, setPoints] = useState(0);
+  const [timeMs, setTimeMs] = useState(0);
   const [finished, setFinished] = useState(false);
 
   const [results, setResults] = useState<RemoteResult[]>([]);
   const [showMore, setShowMore] = useState(false);
   const [userRank, setUserRank] = useState<{ rank: number; best: RemoteResult } | null>(null);
   const [answers, setAnswers] = useState<number[]>([]);
+  const [remainMs, setRemainMs] = useState(15000);
+  const timePerQuestionMs = 15000;
 
   useEffect(() => {
     const unsubscribe = listenUser((u) => {
@@ -64,6 +68,9 @@ export default function RoomPlayPage() {
         setScore(0);
         setFinished(false);
         setAnswers([]);
+        setPoints(0);
+        setTimeMs(0);
+        setRemainMs(timePerQuestionMs);
       }
     }
     fetchRoom();
@@ -96,6 +103,7 @@ export default function RoomPlayPage() {
       const q = room.questions[idx];
       if (choice === q.correctIndex) {
         setScore((s) => s + 1);
+        setPoints((p) => p + 100 + Math.max(0, Math.floor(remainMs / 100)));
         playCorrect();
       } else {
         playWrong();
@@ -105,6 +113,8 @@ export default function RoomPlayPage() {
         next[current] = choice;
         return next;
       });
+      setTimeMs((t) => t + (timePerQuestionMs - Math.max(0, remainMs)));
+      setRemainMs(timePerQuestionMs);
       if (current + 1 >= order.length) {
         setFinished(true);
         playFinish();
@@ -112,7 +122,7 @@ export default function RoomPlayPage() {
         setCurrent((c) => c + 1);
       }
     },
-    [currentQuestion, room, order, current]
+    [currentQuestion, room, order, current, remainMs]
   );
 
   const resetQuiz = () => {
@@ -126,16 +136,20 @@ export default function RoomPlayPage() {
   useEffect(() => {
     async function saveResult() {
       if (!finished || !room || !user) return;
-      await addRoomResult(room.id, user, score, room.questions.length);
+      await addRoomResult(room.id, user, score, room.questions.length, { points, timeMs });
       // 去重：同一 userUid 只保留最高分
       const list = await getRoomResults(room.id, 500);
       const bestMap = new Map<string, RemoteResult>();
       list.forEach((r) => {
         const exists = bestMap.get(r.userUid);
-        if (!exists || r.score > exists.score) bestMap.set(r.userUid, r);
+        const rp = r.points ?? r.score;
+        const ep = exists ? (exists.points ?? exists.score) : -1;
+        if (!exists || rp > ep) bestMap.set(r.userUid, r);
       });
       const dedup = Array.from(bestMap.values()).sort((a, b) =>
-        b.score !== a.score ? b.score - a.score : a.createdAt - b.createdAt
+        (b.points ?? b.score) !== (a.points ?? a.score)
+          ? (b.points ?? b.score) - (a.points ?? a.score)
+          : a.createdAt - b.createdAt
       );
       setResults(dedup);
       const rank = await getUserRank(room.id, user.uid);
@@ -194,6 +208,20 @@ export default function RoomPlayPage() {
   }
 
   const visibleResults = results.slice(0, showMore ? 30 : 10);
+  // 倒數計時
+  useEffect(() => {
+    if (finished || !room) return;
+    const timer = setInterval(() => {
+      setRemainMs((ms) => {
+        if (ms <= 100) {
+          answer(-1 as any);
+          return timePerQuestionMs;
+        }
+        return ms - 100;
+      });
+    }, 100);
+    return () => clearInterval(timer);
+  }, [finished, room, answer, current]);
   const wrongs = finished && room
     ? order
         .map((idx, i) => ({ i, q: room.questions[idx], chosen: answers[i] }))
@@ -221,7 +249,7 @@ export default function RoomPlayPage() {
             {!finished ? (
               <>
                 <div className="text-sm text-gray-600">
-                  {user.name}，第 {current + 1} 題／共 {room.questions.length} 題，分數：{score}
+                  {user.name}，第 {current + 1} 題／共 {room.questions.length} 題，分數：{score}｜積分：{points}｜剩餘：{Math.ceil(remainMs/1000)} 秒（鍵盤 1~4 作答，Enter 下一題）
                 </div>
                 <div className="rounded-2xl border border-pink-200 bg-white/90 p-4">
                   {currentQuestion?.prompt}
