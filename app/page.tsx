@@ -1,13 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import AddQuestion from "@/components/AddQuestion";
-import PlayQuiz from "@/components/PlayQuiz";
 import Leaderboard from "@/components/Leaderboard";
+import RoomLobby from "@/components/RoomLobby";
+import QuizGallery from "@/components/QuizGallery";
 import { Button } from "@/components/ui/button";
+import { listenUser, type SimpleUser } from "@/lib/auth";
+import { isTeacher } from "@/lib/teachers";
+
+type Tab = "play" | "add" | "rank" | "rooms";
 
 export default function Home() {
-  const [tab, setTab] = useState<"play" | "add" | "rank">("play");
+  const [tab, setTab] = useState<Tab>("play");
+  const [user, setUser] = useState<SimpleUser | null>(null);
+  const [isTeacherUser, setIsTeacherUser] = useState<boolean>(false);
+
+  useEffect(() => {
+    const unsub = listenUser(async (u) => {
+      setUser(u);
+      if (u) {
+        const ok = await isTeacher(u.uid);
+        setIsTeacherUser(ok);
+      } else {
+        setIsTeacherUser(false);
+      }
+    });
+    return () => unsub();
+  }, []);
 
   return (
     <main className="container mx-auto max-w-3xl px-4 py-10">
@@ -29,13 +49,15 @@ export default function Home() {
           >
             開始玩！
           </Button>
-          <Button
-            onClick={() => setTab("add")}
-            className="btn-cute btn-pink"
-            aria-pressed={tab === "add"}
-          >
-            出題囉！
-          </Button>
+          {isTeacherUser && (
+            <Button
+              onClick={() => setTab("add")}
+              className="btn-cute btn-pink"
+              aria-pressed={tab === "add"}
+            >
+              出題囉！
+            </Button>
+          )}
           <Button
             onClick={() => setTab("rank")}
             className="btn-cute btn-yellow"
@@ -43,20 +65,29 @@ export default function Home() {
           >
             看排行榜
           </Button>
+          <Button
+            onClick={() => setTab("rooms")}
+            className="btn-cute btn-blue"
+            aria-pressed={tab === "rooms"}
+          >
+            房間模式
+          </Button>
         </div>
 
         <div className="mt-6">
           {tab === "play" ? (
-            <PlayQuiz onExit={() => setTab("rank")} />
+            <QuizGallery />
           ) : tab === "add" ? (
             <AddQuestion />
-          ) : (
+          ) : tab === "rank" ? (
             <Leaderboard />
+          ) : (
+            <RoomLobby />
           )}
         </div>
 
         <div className="mt-6 rounded-2xl border border-pink-200 bg-white/80 p-4 text-sm text-gray-700">
-          想給其他同學一起玩嗎？在【出題囉】頁面完成題目後，點【發佈成分享題庫】，把連結貼給大家，就可以在各自的手機或電腦上作答，成績會記錄在雲端排行榜！
+          想給其他同學一起玩嗎？除了本機出題，也可以到【房間模式】請 Google 登入建立房間，把房間連結分享給同學，大家登入後就能在線上作答並記錄雲端排行榜！
         </div>
       </div>
     </main>

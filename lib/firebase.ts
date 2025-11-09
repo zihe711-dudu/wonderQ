@@ -1,27 +1,41 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, type Firestore } from "firebase/firestore";
+import { getAuth, type Auth } from "firebase/auth";
 
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
-} as const;
+let app: FirebaseApp | null = null;
+let db: Firestore | null = null;
+let auth: Auth | null = null;
 
-function getFirebaseApp(): FirebaseApp | null {
-  if (
-    typeof window === "undefined" ||
-    !firebaseConfig.apiKey ||
-    !firebaseConfig.authDomain ||
-    !firebaseConfig.projectId
-  ) {
-    return null;
+export function getFirebase(): {
+  app: FirebaseApp | null;
+  db: Firestore | null;
+  auth: Auth | null;
+} {
+  if (app && db && auth) {
+    return { app, db, auth };
   }
-  return getApps().length ? getApp() : initializeApp(firebaseConfig);
+
+  if (
+    !process.env.NEXT_PUBLIC_FIREBASE_API_KEY ||
+    !process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ||
+    !process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
+  ) {
+    return { app: null, db: null, auth: null };
+  }
+
+  const config = {
+    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
+  };
+
+  const existingApp = getApps().length ? getApp() : initializeApp(config);
+  app = existingApp;
+  db = getFirestore(existingApp);
+  auth = getAuth(existingApp);
+
+  return { app, db, auth };
 }
 
-const app = getFirebaseApp();
-
-// 若未設定環境變數，避免在 import 階段拋錯；實際呼叫雲端功能時仍需檢查設定
-export const db = app ? getFirestore(app) : (null as any);
 
 

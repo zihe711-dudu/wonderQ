@@ -1,12 +1,14 @@
-import { db } from "@/lib/firebase";
+import { getFirebase } from "@/lib/firebase";
 import { addDoc, collection, doc, getDoc, getDocs, query } from "firebase/firestore";
 import type { QuizQuestion, RemoteQuiz, RemoteResult } from "@/types";
 
-const isConfigured =
-  typeof window !== "undefined" &&
-  !!process.env.NEXT_PUBLIC_FIREBASE_API_KEY &&
-  !!process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN &&
-  !!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+function ensureDb() {
+  const { db } = getFirebase();
+  if (!db) {
+    throw new Error("尚未設定 Firebase 連線資訊");
+  }
+  return db;
+}
 
 export async function publishQuizFromLocal(
   localQuestions: QuizQuestion[],
@@ -16,14 +18,17 @@ export async function publishQuizFromLocal(
   if (!Array.isArray(localQuestions) || localQuestions.length === 0) {
     throw new Error("無題目可發佈");
   }
-  if (!isConfigured) {
-    throw new Error("尚未設定 Firebase 連線資訊");
-  }
   try {
+    const db = ensureDb();
     const quizzesCol = collection(db, "quizzes");
+    const safeTitle = title?.trim() || "我的小小問答挑戰";
+    const safeCreator = creatorName?.trim() || "小老師";
     const payload = {
-      title: title?.trim() || "我的小小問答挑戰",
-      creatorName: creatorName?.trim() || "小老師",
+      title: safeTitle,
+      ownerUid: "",
+      ownerName: safeCreator,
+      ownerPhotoUrl: null,
+      questionCount: localQuestions.length,
       questions: localQuestions,
       createdAt: Date.now()
     };
@@ -35,17 +40,23 @@ export async function publishQuizFromLocal(
 }
 
 export async function loadRemoteQuiz(quizId: string): Promise<RemoteQuiz | null> {
-  if (!isConfigured) return null;
   try {
+    const db = ensureDb();
     const ref = doc(db, "quizzes", quizId);
     const snap = await getDoc(ref);
     if (!snap.exists()) return null;
     const data = snap.data() as any;
+    const questions = Array.isArray(data.questions)
+      ? (data.questions as QuizQuestion[])
+      : [];
     const quiz: RemoteQuiz = {
       id: snap.id,
       title: data.title ?? "未命名題庫",
-      creatorName: data.creatorName ?? "小老師",
-      questions: Array.isArray(data.questions) ? (data.questions as QuizQuestion[]) : [],
+      ownerUid: data.ownerUid ?? "",
+      ownerName: data.ownerName ?? data.creatorName ?? "小老師",
+      ownerPhotoUrl: data.ownerPhotoUrl ?? null,
+      questionCount: (data.questionCount ?? questions.length) || 10,
+      questions,
       createdAt: typeof data.createdAt === "number" ? data.createdAt : Date.now()
     };
     return quiz;
@@ -60,12 +71,14 @@ export async function addRemoteResult(
   score: number,
   total: number
 ): Promise<void> {
-  if (!isConfigured) return;
   try {
+    const db = ensureDb();
     const resultsCol = collection(db, "quizzes", quizId, "results");
     const safeName = (name?.trim() || "小朋友").slice(0, 16);
     await addDoc(resultsCol, {
+      userUid: "",
       name: safeName,
+      photoUrl: null,
       score,
       total,
       createdAt: Date.now()
@@ -76,8 +89,8 @@ export async function addRemoteResult(
 }
 
 export async function getTopResults(quizId: string, limitN: number): Promise<RemoteResult[]> {
-  if (!isConfigured) return [];
   try {
+    const db = ensureDb();
     const resultsCol = collection(db, "quizzes", quizId, "results");
     // 為避免索引需求，簡化為抓取全部再前端排序；教學/小量資料可接受
     const q = query(resultsCol);
@@ -86,7 +99,9 @@ export async function getTopResults(quizId: string, limitN: number): Promise<Rem
       const data = d.data() as any;
       return {
         id: d.id,
+        userUid: data.userUid ?? "",
         name: data.name ?? "小朋友",
+        photoUrl: data.photoUrl ?? null,
         score: Number(data.score) || 0,
         total: Number(data.total) || 0,
         createdAt: typeof data.createdAt === "number" ? data.createdAt : Date.now()

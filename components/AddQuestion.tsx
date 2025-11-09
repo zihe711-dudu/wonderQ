@@ -4,7 +4,6 @@ import { useCallback, useMemo, useState } from "react";
 import { STORAGE_KEY, type QuizQuestion } from "@/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { publishQuizFromLocal } from "@/lib/cloud";
 
 type OptionsArray = [string, string, string, string];
 
@@ -26,7 +25,6 @@ export default function AddQuestion() {
   const [options, setOptions] = useState<OptionsArray>(["", "", "", ""]);
   const [correctIndex, setCorrectIndex] = useState<0 | 1 | 2 | 3>(0);
   const [message, setMessage] = useState<string>("");
-  const [shareLink, setShareLink] = useState<string>("");
 
   const isValid = useMemo(() => {
     return (
@@ -80,30 +78,6 @@ export default function AddQuestion() {
   const onClearAll = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY);
     setMessage("已清空所有本機題目！");
-    setShareLink("");
-  }, []);
-
-  const onPublish = useCallback(async () => {
-    const existing = loadExisting();
-    if (existing.length === 0) {
-      setMessage("請先新增幾題再發佈喔！");
-      setShareLink("");
-      return;
-    }
-    const defaultTitle = "我的小小問答挑戰";
-    const defaultCreator = "小老師";
-    const title = window.prompt("請輸入題庫名稱：", defaultTitle) ?? defaultTitle;
-    const creator = window.prompt("請輸入建立者名稱：", defaultCreator) ?? defaultCreator;
-    try {
-      const quizId = await publishQuizFromLocal(existing, title, creator);
-      const origin = window.location.origin;
-      const link = `${origin}/play/${quizId}`;
-      setShareLink(link);
-      setMessage("發佈成功！把下面的連結分享給同學：");
-    } catch {
-      setMessage("發佈失敗，請稍後再試。");
-      setShareLink("");
-    }
   }, []);
 
   return (
@@ -162,24 +136,14 @@ export default function AddQuestion() {
         </div>
 
         {message && (
-          <div className="space-y-2">
-            <div className="rounded-2xl bg-yellow-100 text-gray-900 px-4 py-2">
-              {message}
-            </div>
-            {shareLink && (
-              <div className="rounded-2xl border border-pink-200 bg-white/90 px-4 py-2 break-all">
-                分享連結：<a className="text-pink-600 underline" href={shareLink} target="_blank" rel="noreferrer">{shareLink}</a>
-              </div>
-            )}
+          <div className="rounded-2xl bg-yellow-100 text-gray-900 px-4 py-2">
+            {message}
           </div>
         )}
       </CardContent>
       <CardFooter className="flex flex-wrap items-center justify-between gap-3">
         <Button onClick={onSubmit} className="btn-cute btn-pink">
           新增題目
-        </Button>
-        <Button onClick={onPublish} className="btn-cute btn-blue">
-          發佈成分享題庫
         </Button>
         <Button onClick={onClearAll} variant="outline">
           清空全部題目

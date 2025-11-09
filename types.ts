@@ -17,21 +17,27 @@ export type LeaderboardEntry = {
 
 export const LEADERBOARD_KEY = "quizy_tw_kids_leaderboard";
 
+export type RoomQuestionCount = 10 | 20 | 30;
+
 export type RemoteQuiz = {
   id: string;
   title: string;
-  creatorName: string;
+  ownerUid: string;
+  ownerName: string;
+  ownerPhotoUrl: string | null;
+  questionCount: RoomQuestionCount;
   questions: QuizQuestion[];
   createdAt: number;
 };
 
 export type RemoteResult = {
   id: string;
+  userUid: string;
   name: string;
+  photoUrl: string | null;
   score: number;
   total: number;
   createdAt: number;
 };
-
 
 
