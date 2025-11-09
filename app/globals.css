@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 255 255 255;
+    --foreground: 17 24 39;
+  }
+  html, body {
+    font-family: "Microsoft JhengHei", "微軟正黑體", "PingFang TC", "Noto Sans TC", ui-sans-serif, system-ui, sans-serif;
+  }
+}
+
+/* 柔和粉色系背景（整體），主要由 layout.tsx 的 body gradient 控制 */
+
+/* shadcn/ui 基本樣式微調 */
+.btn-cute {
+  @apply rounded-2xl px-5 py-2.5 text-white shadow-md transition-transform active:scale-95;
+}
+.btn-pink {
+  @apply bg-pink-400 hover:bg-pink-500;
+}
+.btn-blue {
+  @apply bg-blue-400 hover:bg-blue-500;
+}
+.btn-yellow {
+  @apply bg-yellow-400 hover:bg-yellow-500 text-gray-900;
+}
+
+
