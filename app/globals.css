@@ -3,6 +3,7 @@
 @tailwind utilities;
 
 @layer base {
+  @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&family=Fredoka:wght@700&display=swap');
   :root {
     --background: 255 255 255;
     --foreground: 17 24 39;
@@ -26,6 +27,19 @@
 }
 .btn-yellow {
   @apply bg-yellow-400 hover:bg-yellow-500 text-gray-900;
+}
+
+/* WonderQ 標準字：卡通風字型 + 更粗、更圓的字重與字距 */
+.brand-wordmark {
+  font-family: "Baloo 2", "Fredoka", "Microsoft JhengHei", "微軟正黑體", ui-sans-serif, system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+/* 數字專用：統一數字字型與等寬位數，避免跳動 */
+.num-font {
+  font-family: "Fredoka", "Microsoft JhengHei", "微軟正黑體", ui-sans-serif, system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
 }
 
 

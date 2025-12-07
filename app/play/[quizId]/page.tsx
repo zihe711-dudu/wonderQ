@@ -130,6 +130,10 @@ export default function RoomPlayPage() {
     setOrder(shuffle(room.questions.map((_, i) => i)));
     setCurrent(0);
     setScore(0);
+    setPoints(0);
+    setTimeMs(0);
+    setAnswers([]);
+    setRemainMs(timePerQuestionMs);
     setFinished(false);
   };
 
@@ -156,7 +160,22 @@ export default function RoomPlayPage() {
       setUserRank(rank);
     }
     saveResult();
-  }, [finished, room, user, score]);
+  }, [finished, room, user, score, points, timeMs]);
+
+  // 倒數計時（hooks 必須在任何 early return 之前宣告）
+  useEffect(() => {
+    if (finished || !room) return;
+    const timer = setInterval(() => {
+      setRemainMs((ms) => {
+        if (ms <= 100) {
+          answer(-1 as any);
+          return timePerQuestionMs;
+        }
+        return ms - 100;
+      });
+    }, 100);
+    return () => clearInterval(timer);
+  }, [finished, room, answer, current]);
 
   if (loadingUser || loadingRoom) {
     return (
@@ -208,20 +227,6 @@ export default function RoomPlayPage() {
   }
 
   const visibleResults = results.slice(0, showMore ? 30 : 10);
-  // 倒數計時
-  useEffect(() => {
-    if (finished || !room) return;
-    const timer = setInterval(() => {
-      setRemainMs((ms) => {
-        if (ms <= 100) {
-          answer(-1 as any);
-          return timePerQuestionMs;
-        }
-        return ms - 100;
-      });
-    }, 100);
-    return () => clearInterval(timer);
-  }, [finished, room, answer, current]);
   const wrongs = finished && room
     ? order
         .map((idx, i) => ({ i, q: room.questions[idx], chosen: answers[i] }))

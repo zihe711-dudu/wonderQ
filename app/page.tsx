@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import AddQuestion from "@/components/AddQuestion";
 import Leaderboard from "@/components/Leaderboard";
 import RoomLobby from "@/components/RoomLobby";
@@ -8,10 +9,12 @@ import QuizGallery from "@/components/QuizGallery";
 import { Button } from "@/components/ui/button";
 import { listenUser, type SimpleUser } from "@/lib/auth";
 import { isTeacher } from "@/lib/teachers";
+import Avatar from "@/components/Avatar";
 
 type Tab = "play" | "add" | "rank" | "rooms";
 
 export default function Home() {
+  const router = useRouter();
   const [tab, setTab] = useState<Tab>("play");
   const [user, setUser] = useState<SimpleUser | null>(null);
   const [isTeacherUser, setIsTeacherUser] = useState<boolean>(false);
@@ -32,13 +35,14 @@ export default function Home() {
   return (
     <main className="container mx-auto max-w-3xl px-4 py-10">
       <div className="rounded-3xl bg-white/70 shadow-lg backdrop-blur p-6 sm:p-8">
-        <div className="flex flex-col items-center text-center">
-          <h1 className="text-3xl font-bold tracking-tight">
-            台灣小朋友問答遊戲
-          </h1>
-          <p className="mt-2 text-gray-600">
-            自己出題、隨機作答、立即計分。一起開心學習！
-          </p>
+        <div className="flex items-center justify-between">
+          <div className="flex flex-col items-start text-left">
+            <h1 className="sr-only">WonderQ — 台灣小朋友問答遊戲</h1>
+            <p className="mt-2 text-gray-600">
+              台灣小朋友問答遊戲：自己出題、隨機作答、立即計分。一起開心學習！
+            </p>
+          </div>
+          <div />
         </div>
 
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
@@ -72,6 +76,7 @@ export default function Home() {
           >
             房間模式
           </Button>
+          {/* 右上角已顯示使用者頭像與暱稱作為「我的」入口 */}
         </div>
 
         <div className="mt-6">

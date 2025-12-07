@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import AuthBar from "@/components/AuthBar";
 import RoomBuilder from "@/components/RoomBuilder";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -57,8 +56,6 @@ export default function RoomLobby() {
 
   return (
     <div className="space-y-6">
-      <AuthBar />
-
       {loadingUser ? (
         <p className="text-sm text-gray-600">登入狀態載入中…</p>
       ) : user ? (

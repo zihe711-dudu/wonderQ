@@ -4,13 +4,63 @@
 
 ## 啟動（本機）
 
-1. 於根目錄建立 `.env.local`，並設定：
-   - `NEXT_PUBLIC_FIREBASE_API_KEY=...`
-   - `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=...`
-   - `NEXT_PUBLIC_FIREBASE_PROJECT_ID=...`
-2. 安裝依賴並啟動：
-   - `npm install`
-   - `npm run dev`
+### ⚡ 最簡單的方式
+
+**macOS/Linux：**
+```bash
+./start.sh
+```
+
+**Windows：**
+```bash
+start.bat
+```
+
+或直接雙擊 `start.sh`（macOS/Linux）或 `start.bat`（Windows）文件
+
+✅ 就這麼簡單！腳本會自動處理所有步驟。
+
+---
+
+### 手動啟動
+
+```bash
+# 1. 進入專案目錄
+cd quizy-tw-kids
+
+# 2. 安裝依賴
+npm install
+
+# 3. 啟動開發服務器
+npm run dev
+```
+
+### 環境變數設定
+
+在專案根目錄創建 `.env.local` 文件，並設定：
+
+```env
+# Firebase 配置（必需，用於雲端功能）
+NEXT_PUBLIC_FIREBASE_API_KEY=你的Firebase_API_Key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=你的Firebase_Auth_Domain
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=你的Firebase_Project_ID
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=你的Firebase_Storage_Bucket
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=你的Firebase_Messaging_Sender_ID
+NEXT_PUBLIC_FIREBASE_APP_ID=你的Firebase_App_ID
+
+# OpenAI API（可選，僅用於 AI 出題功能）
+OPENAI_API_KEY=你的OpenAI_API_Key
+```
+
+### 訪問應用
+
+啟動後訪問：`http://localhost:3000`
+
+### 詳細說明
+
+- **快速啟動指南：** 查看 `QUICK-START.md`
+- **本地開發完整指南：** 查看 `docs/LOCAL-DEVELOPMENT.md`
+- **部署到線上：** 查看 `docs/DEPLOYMENT.md`
 
 ## 功能簡述
 
@@ -30,11 +80,20 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // quizzes collection
+    // 輔助函數：檢查是否為擁有者
+    function isOwner(ownerUid) {
+      return request.auth != null && request.auth.uid == ownerUid;
+    }
+
+    // quizzes collection（公共題庫）
     match /quizzes/{quizId} {
       allow read: if true;                // 任何人可讀取題庫
       allow create: if true;              // 任何人可新增題庫
-      allow update, delete: if false;     // 禁止更新與刪除
+      // 允許擁有者更新標題、標籤、狀態
+      allow update: if isOwner(resource.data.ownerUid) && 
+                       request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['title', 'tags', 'status', 'updatedAt']);
+      allow delete: if false;             // 禁止刪除（保護資料）
 
       // 成績子集合
       match /results/{resultId} {
@@ -42,6 +101,31 @@ service cloud.firestore {
         allow create: if true;            // 任何人可新增成績
         allow update, delete: if false;   // 禁止更新與刪除
       }
+    }
+
+    // rooms collection（房間模式）
+    match /rooms/{roomId} {
+      allow read: if true;                // 任何人可讀取房間（但前端會過濾已下架）
+      allow create: if request.auth != null;  // 需登入才能建立房間
+      // 允許擁有者更新標題、狀態
+      allow update: if isOwner(resource.data.ownerUid) && 
+                       request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['title', 'status', 'updatedAt']);
+      // 允許擁有者刪除自己的房間
+      allow delete: if isOwner(resource.data.ownerUid);
+
+      // 房間成績子集合
+      match /results/{resultId} {
+        allow read: if true;              // 任何人可讀取排行榜
+        allow create: if request.auth != null;  // 需登入才能新增成績
+        allow update, delete: if false;   // 禁止更新與刪除
+      }
+    }
+
+    // teachers collection（白名單）
+    match /teachers/{uid} {
+      allow read: if true;                // 任何人可讀取（檢查是否為老師）
+      allow write: if false;              // 禁止寫入（需手動在 Firebase Console 設定）
     }
   }
 }

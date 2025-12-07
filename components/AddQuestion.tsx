@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { listenUser, type SimpleUser } from "@/lib/auth";
 import { isTeacher } from "@/lib/teachers";
 import { publishPublicQuiz } from "@/lib/cloud";
+import { fileToResizedDataUrl, resizeDataUrl } from "@/lib/images";
 
 type OptionsArray = [string, string, string, string];
 
@@ -26,6 +27,7 @@ function loadExisting(): QuizQuestion[] {
 export default function AddQuestion() {
   const [user, setUser] = useState<SimpleUser | null>(null);
   const [isTeacherUser, setIsTeacherUser] = useState<boolean>(false);
+  const [shareLink, setShareLink] = useState<string>("");
   useEffect(() => {
     const unsub = listenUser(async (u) => {
       setUser(u);
@@ -42,6 +44,8 @@ export default function AddQuestion() {
   const [options, setOptions] = useState<OptionsArray>(["", "", "", ""]);
   const [correctIndex, setCorrectIndex] = useState<0 | 1 | 2 | 3>(0);
   const [message, setMessage] = useState<string>("");
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState<boolean>(false);
 
   const isValid = useMemo(() => {
     return (
@@ -56,6 +60,7 @@ export default function AddQuestion() {
     setPrompt("");
     setOptions(["", "", "", ""]);
     setCorrectIndex(0);
+    setImagePreview(null);
   }, []);
 
   const onChangeOption = useCallback(
@@ -83,14 +88,15 @@ export default function AddQuestion() {
         options[2].trim(),
         options[3].trim()
       ],
-      correctIndex
+      correctIndex,
+      imageUrl: imagePreview ?? null
     };
     const existing = loadExisting();
     const next = [...existing, newQ];
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
     setMessage("新增成功！已經把題目存到電腦裡囉！");
     resetForm();
-  }, [isValid, prompt, options, correctIndex, resetForm]);
+  }, [isValid, prompt, options, correctIndex, imagePreview, resetForm]);
 
   const onClearAll = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY);
@@ -131,11 +137,44 @@ export default function AddQuestion() {
                 const resp = await fetch("/api/ai/generate-quiz", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ topic, grade: "G4", difficulty: "easy", count: 20 })
+                  body: JSON.stringify({ topic, grade: "G4", difficulty: "easy", count: 20, withImages: true })
                 });
                 const data = await resp.json();
                 if (!resp.ok) throw new Error(data?.error || "AI 產生失敗");
-                const questions: QuizQuestion[] = data?.questions ?? [];
+                let questions: QuizQuestion[] = data?.questions ?? [];
+                // 若缺圖：改由後端逐題產圖，避免一次回傳過大；完成後壓縮至 3:2
+                for (let i = 0; i < questions.length; i++) {
+                  const q = questions[i] as any;
+                  if (!q.imageUrl) {
+                    try {
+                      const p =
+                        q.imagePrompt ||
+                        [
+                          "兒童友善、明亮活潑，與題目情境相符，避免畫面文字。",
+                          `題目：「${q.prompt}」`,
+                          "3:2 構圖（寬>高），主體清楚。"
+                        ].join("\n");
+                      const imgResp = await fetch("/api/ai/generate-image", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ prompt: p })
+                      });
+                      if (imgResp.ok) {
+                        const imgData = await imgResp.json();
+                        const resized = await resizeDataUrl(imgData.image, 900, 600, "image/webp", 0.82);
+                        q.imageUrl = resized;
+                      }
+                    } catch {
+                      // 忽略單題失敗
+                    }
+                  } else {
+                    try {
+                      q.imageUrl = await resizeDataUrl(q.imageUrl, 900, 600, "image/webp", 0.82);
+                    } catch {
+                      q.imageUrl = null;
+                    }
+                  }
+                }
                 if (!user) throw new Error("尚未登入");
                 const quizId = await publishPublicQuiz(questions, title, {
                   uid: user.uid,
@@ -144,7 +183,8 @@ export default function AddQuestion() {
                 });
                 const origin = window.location.origin;
                 const link = `${origin}/quiz/${quizId}`;
-                setMessage(`AI 出題完成並已發佈！分享連結：${link}`);
+                setShareLink(link);
+                setMessage("AI 出題完成並已發佈！");
               } catch (e: any) {
                 setMessage(e?.message || "AI 出題失敗，請稍後再試。");
               }
@@ -165,6 +205,56 @@ export default function AddQuestion() {
             onChange={(e) => setPrompt(e.target.value)}
             rows={3}
           />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            題目圖片（可留空）
+          </label>
+          <input
+            type="file"
+            accept="image/*"
+            className="w-full rounded-2xl border border-pink-200 bg-white/90 p-3 outline-none focus:ring-2 focus:ring-pink-300"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (!file) {
+                setImagePreview(null);
+                return;
+              }
+              if (file.size > 2 * 1024 * 1024) {
+                setMessage("圖片太大啦！請選擇 2MB 以下的圖片。");
+                setImagePreview(null);
+                return;
+              }
+              setUploadingImage(true);
+              fileToResizedDataUrl(file, 900, 600, "image/webp", 0.82)
+                .then((url) => setImagePreview(url))
+                .catch(() => {
+                  setMessage("上傳圖片失敗，請再試一次。");
+                  setImagePreview(null);
+                })
+                .finally(() => setUploadingImage(false));
+            }}
+          />
+          {uploadingImage && (
+            <div className="mt-2 text-sm text-blue-600">圖片處理中，請稍候…</div>
+          )}
+          {imagePreview && !uploadingImage && (
+            <div className="mt-3 flex flex-col items-center gap-2">
+              <img
+                src={imagePreview}
+                alt="題目預覽"
+                className="max-h-40 w-auto rounded-2xl border border-pink-200 object-contain"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setImagePreview(null)}
+              >
+                移除圖片
+              </Button>
+            </div>
+          )}
         </div>
 
         <div className="grid gap-3">
@@ -205,6 +295,25 @@ export default function AddQuestion() {
         {message && (
           <div className="rounded-2xl bg-yellow-100 text-gray-900 px-4 py-2">
             {message}
+          </div>
+        )}
+        {shareLink && (
+          <div className="flex items-center gap-2 rounded-2xl bg-blue-50 px-4 py-2 text-sm text-gray-900">
+            <span className="truncate">分享連結：<span className="font-medium">{shareLink}</span></span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(shareLink);
+                  setMessage("已複製分享連結！");
+                } catch {
+                  setMessage("複製失敗，請手動選取連結。");
+                }
+              }}
+            >
+              複製
+            </Button>
           </div>
         )}
       </CardContent>

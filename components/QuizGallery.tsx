@@ -76,18 +76,30 @@ export default function QuizGallery() {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
+      <form
+        className="flex items-center gap-2"
+        role="search"
+        aria-label="搜尋公開題庫"
+        onSubmit={(e) => {
+          e.preventDefault();
+          // 即時過濾已生效，提交僅作為鍵盤使用者的可及性回饋
+        }}
+      >
+        <label htmlFor="quiz-search" className="sr-only">
+          搜尋題庫或老師名稱
+        </label>
         <input
+          id="quiz-search"
           type="text"
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
           placeholder="搜尋題庫或老師名稱"
           className="flex-1 rounded-2xl border border-pink-200 bg-white/90 p-3 outline-none focus:ring-2 focus:ring-pink-300"
         />
-        <Button variant="outline" onClick={() => router.push("/")}>
-          回首頁
+        <Button type="submit" variant="outline" aria-label="搜尋">
+          搜尋
         </Button>
-      </div>
+      </form>
       {filtered.length === 0 && (
         <div className="rounded-2xl bg-yellow-100 text-gray-900 px-4 py-2">
           找不到符合「{keyword}」的題庫。

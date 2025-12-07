@@ -33,7 +33,12 @@ export default function PublicQuizPlayPage() {
   const [name, setName] = useState<string>("小朋友");
   const [top, setTop] = useState<RemoteResult[]>([]);
   const [saving, setSaving] = useState(false);
+  const [savedOnce, setSavedOnce] = useState(false);
   const [answers, setAnswers] = useState<number[]>([]);
+  const [points, setPoints] = useState(0);
+  const [timeMs, setTimeMs] = useState(0);
+  const [remainMs, setRemainMs] = useState(15000);
+  const timePerQuestionMs = 15000;
 
   useEffect(() => {
     const unsub = listenUser((u) => {
@@ -86,12 +91,16 @@ export default function PublicQuizPlayPage() {
       if (!currentQuestion || !quiz) return;
       const idx = order[current];
       const q = quiz.questions[idx];
+      const used = Math.max(0, timePerQuestionMs - remainMs);
       if (choice === q.correctIndex) {
         setScore((s) => s + 1);
         playCorrect();
+        const gain = Math.max(10, Math.round((remainMs / timePerQuestionMs) * 1000));
+        setPoints((p) => p + gain);
       } else {
         playWrong();
       }
+      setTimeMs((t) => t + used);
       setAnswers((prev) => {
         const next = [...prev];
         next[current] = choice;
@@ -102,9 +111,10 @@ export default function PublicQuizPlayPage() {
         playFinish();
       } else {
         setCurrent((c) => c + 1);
+        setRemainMs(timePerQuestionMs);
       }
     },
-    [current, currentQuestion, order, quiz]
+    [current, currentQuestion, order, quiz, remainMs]
   );
 
   const reset = useCallback(() => {
@@ -114,6 +124,9 @@ export default function PublicQuizPlayPage() {
     setScore(0);
     setFinished(false);
     setAnswers([]);
+    setPoints(0);
+    setTimeMs(0);
+    setRemainMs(timePerQuestionMs);
   }, [quiz]);
 
   useEffect(() => {
@@ -153,14 +166,27 @@ export default function PublicQuizPlayPage() {
   }, [quiz, finished, current, order, answer, reset]);
 
   const saveResult = useCallback(async () => {
-    if (!quiz) return;
+    if (!quiz || !user || savedOnce) return;
     setSaving(true);
-    await addRemoteResult(quiz.id, name, score, quiz.questions.length, { points, timeMs });
+    await addRemoteResult(
+      quiz.id,
+      { uid: user.uid, name: user.name, photoUrl: user.photoUrl },
+      score,
+      quiz.questions.length,
+      { points, timeMs }
+    );
     const list = await getTopResults(quiz.id, 10);
     setTop(list);
+    setSavedOnce(true);
     setSaving(false);
-    alert("已把你的成績存到雲端排行榜！");
-  }, [quiz, name, score, points, timeMs]);
+  }, [quiz, user, score, points, timeMs, savedOnce]);
+
+  // 自動存成績：完成當下即寫入，避免重複按鈕與多次提交
+  useEffect(() => {
+    if (finished) {
+      saveResult();
+    }
+  }, [finished, saveResult]);
 
   if (loading) {
     return (
@@ -265,9 +291,6 @@ export default function PublicQuizPlayPage() {
                 </div>
               </CardContent>
               <CardFooter className="flex flex-wrap items-center justify-center gap-3">
-                <Button disabled={saving} onClick={saveResult} className="btn-cute btn-pink">
-                  把成績存到雲端排行榜
-                </Button>
                 <Button onClick={reset} className="btn-cute btn-blue">
                   再玩一次
                 </Button>
@@ -300,7 +323,7 @@ export default function PublicQuizPlayPage() {
                       <span className="font-semibold">{e.name}</span>
                     </div>
                     <div className="text-pink-600 font-bold">
-                      {e.score} / {e.total}
+                      積分 {e.points ?? e.score}（{e.score}/{e.total}）
                     </div>
                   </li>
                 ))}

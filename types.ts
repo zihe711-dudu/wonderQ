@@ -3,6 +3,7 @@ export type QuizQuestion = {
   prompt: string;
   options: [string, string, string, string];
   correctIndex: 0 | 1 | 2 | 3;
+  imageUrl?: string | null;
 };
 
 export const STORAGE_KEY = "quizy_tw_kids_questions";
